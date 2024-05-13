@@ -1,6 +1,7 @@
 from tkinter import Tk, Frame, Button
 from tkinter.scrolledtext import ScrolledText
 import sys
+from time import sleep
 
 
 class Settings:
@@ -85,6 +86,11 @@ class BasicLLMChat:
         self.root.bind(Settings.send_keybind, self._clear_chat_box)
         self.chat_box.pack()
 
+        # Used as input to the LLM
+        self.text = ""
+        # Track the state of whether a message is sent
+        self.is_msg_sent = True
+
         # This is used for putting the previous message into the chat box
         self.history = []
 
@@ -95,7 +101,7 @@ class BasicLLMChat:
             command=self._send_message,
             background=Settings.blue,
             foreground=Settings.light,
-            padx=10,
+            padx=10
         )
         # Get the last item from history (implement longer history?)
         self.previous_button = Button(
@@ -104,25 +110,25 @@ class BasicLLMChat:
             command=self._history_previous,
             background=Settings.light,
             foreground=Settings.dark,
-            padx=5,
+            padx=5
         )
         # Quickly delete everything in the chat box
         self.delete_button = Button(
             self.frame_buttons,
             text="Delete",
-            command=lambda: self._clear_chat_box(),
+            command=self._clear_chat_box,
             background=Settings.light,
             foreground=Settings.dark,
-            padx=5,
+            padx=5
         )
         # Exit the program predictably
         self.exit_button = Button(
             self.frame_buttons,
             text="Exit",
-            command=lambda: self._exit_gui(),
+            command=self._exit_gui,
             background=Settings.light,
             foreground=Settings.dark,
-            padx=5,
+            padx=5
         )
 
         self.send_button.grid(row=0, column=0, padx=3)
@@ -136,25 +142,35 @@ class BasicLLMChat:
 
         self.root.mainloop()
 
-    def _send_message(self, event=None):
-        """Send message to the LLM"""
-        text = self.chat_box.get("1.0", "end-1c")
-        if text == "":
-            return None
-
-        # Make messages editable, insert text, and disable edits
+    def _insert_text(self, to_insert):
+        """Make messages editable, insert text, and disable edits"""
         self.messages.config(state="normal")
-        self.messages.insert("end", f"USER:\n{text}\n\n")
+        self.messages.insert("end", to_insert)
         self.messages.config(state="disabled")
 
+    def _send_message(self):
+        """Send message to the LLM"""
+        self.text = self.chat_box.get("1.0", "end-1c")
+        if self.text == "":
+            return None
+
+        self._insert_text(f"USER:\n{self.text}\n\n")
+
         # Save sent stuff to history
-        self.history.append(text)
+        self.history.append(self.text)
         # Clear chat box on send
         self.chat_box.delete("1.0", "end-1c")
         # Too many messages to fit the screen -> move to the last
         self.messages.see("end")
 
-    def _clear_chat_box(self, event=None):
+        # Lets other parts of the code know that a message has been sent
+        self.is_msg_sent = True
+        print("Should be true", self.is_msg_sent)
+
+        # Run answerer code after 1ms
+        self.root.after(1, self._get_answer)
+
+    def _clear_chat_box(self):
         """Delete everything in the chat box"""
         self.chat_box.delete("1.0", "end-1c")
 
@@ -166,25 +182,36 @@ class BasicLLMChat:
             return None
 
         # Get last saved message
-        text = self.history[n_items - 1]
+        last_msg = self.history[n_items - 1]
         self.chat_box.delete("1.0", "end")
-        self.chat_box.insert("end", text)
+        self.chat_box.insert("end", last_msg)
 
     def _exit_gui(self):
         """Clean up and exit the program"""
         self._clear_chat_box()
         self.root.destroy()
         del self.history
+        print("Exiting program.")
         sys.exit(0)
     
-    # def _get_answer(self, event=None):
-    #     """Get answer from LLM"""
-        
-    #     self.messages.config(state="normal")
-    #     self.messages.insert("end", f"test insert ")
-    #     self.messages.config(state="disabled")
+    def _get_answer(self):
+        """Get answer from LLM (toy example)"""
+        if self.is_msg_sent:
+            sample = ["One", " two", " three"]
 
-    #     self.messages.see("end")
+            self._insert_text("LLM:\n")
+
+            for i in sample:
+                sleep(0.5)
+                self._insert_text(i)
+                self.messages.see("end")
+            
+            # Insert newlines after generated text
+            self._insert_text("\n\n")
+
+            # Reset message sent checker
+            self.is_msg_sent = False
+            print("Should be false", self.is_msg_sent)
 
 
 chat = BasicLLMChat()
