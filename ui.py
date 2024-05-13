@@ -1,7 +1,9 @@
 from tkinter import Tk, Frame, Button
 from tkinter.scrolledtext import ScrolledText
+import requests
+import ollama
 import sys
-from time import sleep
+import asyncio
 
 
 class Settings:
@@ -27,7 +29,7 @@ class BasicLLMChat:
 
         # Place to display messages between the user and the LLM
         self.frame_messages = Frame(
-            self.root, 
+            self.root,
             background=Settings.dark,
             padx=10,
             pady=9
@@ -87,12 +89,15 @@ class BasicLLMChat:
         self.chat_box.pack()
 
         # Used as input to the LLM
-        self.text = ""
+        self.user_input = ""
         # Track the state of whether a message is sent
         self.is_msg_sent = True
 
         # This is used for putting the previous message into the chat box
+        # TODO - delete later
         self.history = []
+        # This enables conversations with context
+        self.msg_resp_history = []
 
         # Send messages from the chat box
         self.send_button = Button(
@@ -136,7 +141,7 @@ class BasicLLMChat:
         self.previous_button.grid(row=0, column=2, padx=3)
         # Position the exit button all the way to the right
         self.exit_button.grid(row=0, column=3, sticky="E", padx=3)
-        
+
         # Safe exit
         self.root.protocol("WM_DELETE_WINDOW", self._exit_gui)
 
@@ -148,16 +153,16 @@ class BasicLLMChat:
         self.messages.insert("end", to_insert)
         self.messages.config(state="disabled")
 
-    def _send_message(self):
+    def _send_message(self, event=None):
         """Send message to the LLM"""
-        self.text = self.chat_box.get("1.0", "end-1c")
-        if self.text == "":
+        self.user_input = self.chat_box.get("1.0", "end-1c")
+        if self.user_input == "":
             return None
 
-        self._insert_text(f"USER:\n{self.text}\n\n")
+        self._insert_text(f"USER:\n{self.user_input}\n\n")
 
         # Save sent stuff to history
-        self.history.append(self.text)
+        self.history.append(self.user_input)
         # Clear chat box on send
         self.chat_box.delete("1.0", "end-1c")
         # Too many messages to fit the screen -> move to the last
@@ -165,15 +170,15 @@ class BasicLLMChat:
 
         # Lets other parts of the code know that a message has been sent
         self.is_msg_sent = True
-        print("Should be true", self.is_msg_sent)
 
         # Run answerer code after 1ms
         self.root.after(1, self._get_answer)
 
-    def _clear_chat_box(self):
+    def _clear_chat_box(self, event=None):
         """Delete everything in the chat box"""
         self.chat_box.delete("1.0", "end-1c")
 
+    # TODO - duplicate history handling (redo this)
     def _history_previous(self):
         """Get previous sent message into the chat box"""
         n_items = len(self.history)
@@ -193,25 +198,59 @@ class BasicLLMChat:
         del self.history
         print("Exiting program.")
         sys.exit(0)
-    
+
     def _get_answer(self):
-        """Get answer from LLM (toy example)"""
+        """Get answer from LLM"""
+        # Check if ollama is running in the background
+        try:
+            r = requests.get("http://localhost:11434/")
+        except requests.ConnectionError:
+            explanation = "Failed to connect to localhost:11434\nIs Ollama running?"
+            self._insert_text(f"SYSTEM:\n{explanation}\n\n")
+            return None
+
+        if r.status_code != 200:
+            self._insert_text(f"SYSTEM:\nOllama is not running.\n\n")
+            return None
+
         if self.is_msg_sent:
-            sample = ["One", " two", " three"]
+            # Always save what the user asks and the response (further below)
+            self.msg_resp_history.append(
+                {
+                    "role": "user",
+                    "content": self.user_input,
+                }
+            )
+
+            # Connect to the model to chat and get responses in a stream
+            response_stream = ollama.chat(
+                model="llama3",
+                messages=self.msg_resp_history,
+                stream=True
+            )
 
             self._insert_text("LLM:\n")
 
-            for i in sample:
-                sleep(0.5)
-                self._insert_text(i)
+            # TODO currently the gui waits until the response is fully generated
+            # - progressively generate the answer
+            full_response = str()
+            for llm_output in response_stream:
+                self._insert_text(llm_output["message"]["content"])
                 self.messages.see("end")
-            
+                full_response = full_response + llm_output["message"]["content"]
+
+            self.msg_resp_history.append(
+                {
+                    "role": "assistant",
+                    "content": full_response
+                }
+            )
+
             # Insert newlines after generated text
             self._insert_text("\n\n")
 
             # Reset message sent checker
             self.is_msg_sent = False
-            print("Should be false", self.is_msg_sent)
 
 
 chat = BasicLLMChat()

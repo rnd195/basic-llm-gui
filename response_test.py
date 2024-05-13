@@ -1,17 +1,18 @@
 import ollama
 
+# Message-response history
+msg_resp_history = [
+    {
+        "role": "user",
+        "content": "Write the words MAGICAL HOUSE ADVENTURE and nothing else.",
+    }
+]
 
 # Test out ollama response streaming
-get_stream = ollama.chat(
-    model="llama3",
-    messages=[
-        {
-            "role": "user", 
-            "content": "Write the words MAGICAL HOUSE and nothing else."
-        }
-    ],
-    stream=True
-)
+response_stream = ollama.chat(model="llama3", messages=msg_resp_history, stream=True)
 
-for output in get_stream:
-  print(output["message"]["content"], end="-", flush=True)
+full_response = ""
+for llm_output in response_stream:
+    full_response = full_response + llm_output["message"]["content"]
+
+msg_resp_history.append({"role": "assistant", "content": full_response})
