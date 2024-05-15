@@ -3,7 +3,6 @@ from tkinter.scrolledtext import ScrolledText
 import requests
 import ollama
 import sys
-import asyncio
 
 
 class Settings:
@@ -71,6 +70,7 @@ class BasicLLMChat:
             height=30,
             background=Settings.light
         )
+        self.messages.config(wrap="word")
         self.messages.pack()
         # Start in an uneditable mode
         self.messages.config(state="disabled")
@@ -82,6 +82,7 @@ class BasicLLMChat:
             height=10,
             background=Settings.light
         )
+        self.chat_box.config(wrap="word")
         # Send messages using ctrl+enter
         self.chat_box.bind(Settings.send_keybind, self._send_message)
         # Clear the chat box completely (otherwise there would be a newline in the empty box)
@@ -93,8 +94,8 @@ class BasicLLMChat:
         # Track the state of whether a message is sent
         self.is_msg_sent = True
 
-        # This is used for putting the previous message into the chat box
-        # TODO - delete later
+        # This is used for putting the previous message into the chat box.
+        # For simplicity, this history list is independent of the context history below.
         self.history = []
         # This enables conversations with context
         self.msg_resp_history = []
@@ -178,7 +179,6 @@ class BasicLLMChat:
         """Delete everything in the chat box"""
         self.chat_box.delete("1.0", "end-1c")
 
-    # TODO - duplicate history handling (redo this)
     def _history_previous(self):
         """Get previous sent message into the chat box"""
         n_items = len(self.history)
@@ -231,13 +231,13 @@ class BasicLLMChat:
 
             self._insert_text("LLM:\n")
 
-            # TODO currently the gui waits until the response is fully generated
-            # - progressively generate the answer
             full_response = str()
             for llm_output in response_stream:
                 self._insert_text(llm_output["message"]["content"])
                 self.messages.see("end")
                 full_response = full_response + llm_output["message"]["content"]
+                # Progressively generate answer in the GUI
+                self.root.update_idletasks()
 
             self.msg_resp_history.append(
                 {
