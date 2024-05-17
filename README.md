@@ -6,7 +6,7 @@ Below is an example of a short chat with the 8B variant of [Meta Llama 3](https:
 
 ![screenshot](assets/screenshot.jpg)
 
-# How to Use
+# How to Install
 
 Assuming you have Python 3.8+ installed:
 
@@ -19,6 +19,21 @@ Assuming you have Python 3.8+ installed:
 
 4. Start `ui.py` and chat!
 
+# How to Use
+
+Write into the bottom text box and click **Send** (or `Ctrl + Enter`). The first prompt may take a while since the model will be loading in the background. After that, you should see a stream of answers from the LLM.
+
+The **Delete** button deletes everything in the chat box.
+
+The **Previous** button returns the last message/query sent by the user.
+
+The **Exit** button exits the GUI (or simply close out the window).
+
+# To-do
+
+- [ ] Cancel / interrupt the LLM while an answer is being generated
+- [ ] Start a new chat / reset
+- [ ] Improve stability
 
 # License
 

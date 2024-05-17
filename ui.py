@@ -14,12 +14,39 @@ class Settings:
 
 class BasicLLMChat:
     """
-            root
-    ---------------------
-    |   frame_messages  |
-    |   frame_buttons   |
-    |   frame_chat_box  |
-    ---------------------
+    A class for a basic Ollama Chat GUI
+
+    Attributes:
+        root (Tk): Top level tkinter widget
+        frame_messages (Frame): Frame for the messages between the user and LLM
+        frame_buttons (Frame): Frame for buttons to interact with the GUI
+        frame_chat (Frame): Frame for the user's queries
+        messages (ScrolledText): Text widget for messages between the user and LLM with a scrollbar
+        chat_box (ScrolledText): Text widget for the user's queries with a scrollbar
+        user_input (str): Text input from the chat box
+        is_msg_sent (bool): Flag whether a message has been sent by the user
+        history (list): List that saves all user queries - used for retrieving the last query
+        msg_resp_history (list): List of dictionaries containing the queries and responses
+        send_button (Button): Button to send the user's queries to the LLM
+        previous_button (Button): Returns the user's previous query
+        delete_button (Button): Deletes everything currently written in the chat box
+        exit_button (Button): Exits the GUI
+
+                          root
+    -------------------------------------------------
+    |                frame_messages                 |
+    |   -----------------------------------------   |
+    |   |               messages                |   |
+    |   -----------------------------------------   |
+    |                 frame_buttons                 |
+    |   -----------------------------------------   |
+    |   |     send  delete  previous  exit      |   |
+    |   -----------------------------------------   |
+    |                  frame_chat                   |
+    |   -----------------------------------------   |
+    |   |               chat_box                |   |
+    |   -----------------------------------------   |
+    -------------------------------------------------
     """
 
     def __init__(self):
