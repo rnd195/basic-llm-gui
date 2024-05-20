@@ -34,6 +34,7 @@ The **Exit** button exits the GUI (or simply close out the window).
 - [ ] Cancel / interrupt the LLM while an answer is being generated
 - [ ] Start a new chat / reset
 - [ ] Improve stability
+- [ ] Custom button design
 
 # License
 
