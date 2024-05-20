@@ -17,7 +17,7 @@ Assuming you have Python 3.8+ installed:
 3. Download [Llama 3](https://ollama.com/library/llama3) by opening the command line and running
    - `ollama pull llama3`
 
-4. Start `ui.py` and chat!
+4. Make sure that Ollama is running, then start `ui.py` and chat!
 
 # How to Use
 
