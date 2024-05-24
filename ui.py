@@ -3,12 +3,14 @@ from tkinter.scrolledtext import ScrolledText
 import requests
 import ollama
 import sys
+import threading
 
 
 class Settings:
     dark = "#1f1f1f"
     light = "#dadada"
     blue = "#2654d3"
+    lightblue = "#a2b3e1"
     send_keybind = "<Control-Return>"
 
 
@@ -40,7 +42,7 @@ class BasicLLMChat:
     |   -----------------------------------------   |
     |                 frame_buttons                 |
     |   -----------------------------------------   |
-    |   |     send  delete  previous  exit      |   |
+    |   |  send  delete  previous  reset  exit  |   |
     |   -----------------------------------------   |
     |                  frame_chat                   |
     |   -----------------------------------------   |
@@ -72,7 +74,7 @@ class BasicLLMChat:
         # "EW" - ensure that the frame spans from left to right all the way
         self.frame_buttons.grid(row=1, column=0, sticky="EW")
         # Third button (third column) will be aligned to the right
-        self.frame_buttons.columnconfigure(index=3, weight=1)
+        self.frame_buttons.columnconfigure(index=4, weight=1)
 
         # Frame for user input
         self.frame_chat = Frame(
@@ -154,6 +156,15 @@ class BasicLLMChat:
             foreground=Settings.dark,
             padx=5
         )
+        # Start a new chat
+        self.reset_button = Button(
+            self.frame_buttons,
+            text="Reset",
+            command=self._reset_chat,
+            background=Settings.light,
+            foreground=Settings.dark,
+            padx=5
+        )
         # Exit the program predictably
         self.exit_button = Button(
             self.frame_buttons,
@@ -167,8 +178,9 @@ class BasicLLMChat:
         self.send_button.grid(row=0, column=0, padx=3)
         self.delete_button.grid(row=0, column=1, padx=3)
         self.previous_button.grid(row=0, column=2, padx=3)
+        self.reset_button.grid(row=0, column=3, padx=3)
         # Position the exit button all the way to the right
-        self.exit_button.grid(row=0, column=3, sticky="E", padx=3)
+        self.exit_button.grid(row=0, column=4, sticky="E", padx=3)
 
         # Safe exit
         self.root.protocol("WM_DELETE_WINDOW", self._exit_gui)
@@ -196,11 +208,15 @@ class BasicLLMChat:
         # Too many messages to fit the screen -> move to the last
         self.messages.see("end")
 
-        # Lets other parts of the code know that a message has been sent
+        # Let other parts of the code know that a message was sent / response was generated
         self.is_msg_sent = True
+        self.response_finished = False
 
-        # Run answerer code after 1ms
-        self.root.after(1, self._get_answer)
+        # Progressively generate answer in the GUI via threading; improves stability
+        response_thread = threading.Thread(target=self._get_answer, daemon=True)
+
+        # Run response thread after 1ms
+        self.root.after(1, response_thread.start())
 
     def _clear_chat_box(self, event=None):
         """Delete everything in the chat box"""
@@ -226,8 +242,22 @@ class BasicLLMChat:
         print("Exiting program.")
         sys.exit(0)
 
+    def _reset_chat(self):
+        """Clear all history and start a new chat"""
+        if self.response_finished:
+            self.msg_resp_history = []
+
+            self.messages.config(state="normal")
+            self.messages.delete("1.0", "end-1c")
+            self.messages.config(state="disabled")
+            self.messages.see("end")
+
     def _get_answer(self):
         """Get answer from LLM"""
+        # Disable the send button while getting an answer
+        self.send_button["state"] = "disabled"
+        self.send_button.configure(background = Settings.lightblue)
+
         # Check if ollama is running in the background
         try:
             r = requests.get("http://localhost:11434/")
@@ -257,14 +287,14 @@ class BasicLLMChat:
             )
 
             self._insert_text("LLM:\n")
-
+            
+            # Build the response by appending the generated text as it is generated
+            self.response_finished = False
             full_response = str()
             for llm_output in response_stream:
                 self._insert_text(llm_output["message"]["content"])
                 self.messages.see("end")
                 full_response = full_response + llm_output["message"]["content"]
-                # Progressively generate answer in the GUI
-                self.root.update_idletasks()
 
             self.msg_resp_history.append(
                 {
@@ -278,6 +308,11 @@ class BasicLLMChat:
 
             # Reset message sent checker
             self.is_msg_sent = False
+            self.response_finished = True
+
+            # Re-enable the send button
+            self.send_button["state"] = "normal"
+            self.send_button.configure(background = Settings.blue)
 
 
 chat = BasicLLMChat()

@@ -32,15 +32,15 @@ The **Exit** button exits the GUI (or simply close out the window).
 # To-do
 
 - [ ] Cancel / interrupt the LLM while an answer is being generated
-- [ ] Start a new chat / reset
-- [ ] Improve stability
+- [x] Start a new chat / reset
+- [x] Improve stability
 - [ ] Custom button design
 
 # License
 
 This project is licensed under the [MIT License](https://github.com/rnd195/basic-llm-gui/blob/main/LICENSE).
 
-# Attribution
+# Acknowledgements
 
 This project builds upon the concepts and ideas from the following sources:
 
@@ -56,8 +56,13 @@ This project builds upon the concepts and ideas from the following sources:
 
 - Specific sources for chat GUIs in `tkinter`
 
+`https://realpython.com/intro-to-python-threading/`
+
+- Great threading tutorial
+
 `https://stackoverflow.com/questions/3842155/is-there-a-way-to-make-the-tkinter-text-widget-read-only`
 
 `https://github.com/ollama/ollama-python/issues/70`
 
 - Other helpful resources worth mentioning
+
