@@ -16,8 +16,9 @@ Assuming you have Python 3.8+ installed:
 2. Install and run [Ollama](https://ollama.com/)
 3. Download [Llama 3](https://ollama.com/library/llama3) by opening the command line and running
    - `ollama pull llama3`
+4. Make sure that Ollama is running, then start `llm_gui.py` and chat!
 
-4. Make sure that Ollama is running, then start `ui.py` and chat!
+Lastly, Windows users may use the `Start GUI.bat` script, which first starts Ollama with the Llama 3 model and then runs `llm_gui.py` to start the GUI.
 
 # How to Use
 
