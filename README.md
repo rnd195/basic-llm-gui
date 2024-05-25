@@ -24,15 +24,17 @@ Lastly, Windows users may use the `Start GUI.bat` script, which first starts Oll
 
 Write into the bottom text box and click **Send** (or `Ctrl + Enter`). The first prompt may take a while since the model will be loading in the background. After that, you should see a stream of answers from the LLM.
 
-The **Delete** button deletes everything in the chat box.
-
 The **Previous** button returns the last message/query sent by the user.
+
+The **Cancel** button interrupts the response of the LLM.
+
+The **New Chat** button resets history and starts a brand new chat session.
 
 The **Exit** button exits the GUI (or simply close out the window).
 
 # To-do
 
-- [ ] Cancel / interrupt the LLM while an answer is being generated
+- [x] Cancel / interrupt the LLM while an answer is being generated
 - [x] Start a new chat / reset
 - [x] Improve stability
 - [ ] Custom button design

@@ -27,11 +27,14 @@ class BasicLLMChat:
         chat_box (ScrolledText): Text widget for the user's queries with a scrollbar
         user_input (str): Text input from the chat box
         is_msg_sent (bool): Flag whether a message has been sent by the user
-        history (list): List that saves all user queries - used for retrieving the last query
+        response_finished (bool): Flag whether a response from the LLM is completed
+        cancel_response (bool): Flag whether a response from the LLM should be interrupted
+        previous (str): String that stores the last query for retrieval
         msg_resp_history (list): List of dictionaries containing the queries and responses
         send_button (Button): Button to send the user's queries to the LLM
         previous_button (Button): Returns the user's previous query
-        delete_button (Button): Deletes everything currently written in the chat box
+        cancel_button (Button): Interrupts the response of the LLM
+        reset_button (Button): Starts a new chat by clearing history
         exit_button (Button): Exits the GUI
 
                           root
@@ -42,7 +45,7 @@ class BasicLLMChat:
     |   -----------------------------------------   |
     |                 frame_buttons                 |
     |   -----------------------------------------   |
-    |   |  send  delete  previous  reset  exit  |   |
+    |   |  send prev newchat cancel       exit  |   |
     |   -----------------------------------------   |
     |                  frame_chat                   |
     |   -----------------------------------------   |
@@ -119,13 +122,15 @@ class BasicLLMChat:
         self.chat_box.pack()
 
         # Used as input to the LLM
-        self.user_input = ""
-        # Track the state of whether a message is sent
-        self.is_msg_sent = True
+        self.user_input = str()
+        # Track whether a message is sent, response is finished, or user wants to cancel the response
+        self.is_msg_sent = False
+        self.response_finished = False
+        self.cancel_response = False
 
         # This is used for putting the previous message into the chat box.
         # For simplicity, this history list is independent of the context history below.
-        self.history = []
+        self.previous = str()
         # This enables conversations with context
         self.msg_resp_history = []
 
@@ -138,20 +143,20 @@ class BasicLLMChat:
             foreground=Settings.light,
             padx=10
         )
-        # Get the last item from history (implement longer history?)
+        # Get the last saved message
         self.previous_button = Button(
             self.frame_buttons,
             text="Previous",
-            command=self._history_previous,
+            command=self._get_previous,
             background=Settings.light,
             foreground=Settings.dark,
             padx=5
         )
-        # Quickly delete everything in the chat box
-        self.delete_button = Button(
+        # Interrupt the llm while it is generating an answer
+        self.cancel_button = Button(
             self.frame_buttons,
-            text="Delete",
-            command=self._clear_chat_box,
+            text="Cancel",
+            command=self._cancel_request,
             background=Settings.light,
             foreground=Settings.dark,
             padx=5
@@ -159,7 +164,7 @@ class BasicLLMChat:
         # Start a new chat
         self.reset_button = Button(
             self.frame_buttons,
-            text="Reset",
+            text="New Chat",
             command=self._reset_chat,
             background=Settings.light,
             foreground=Settings.dark,
@@ -176,8 +181,8 @@ class BasicLLMChat:
         )
 
         self.send_button.grid(row=0, column=0, padx=3)
-        self.delete_button.grid(row=0, column=1, padx=3)
-        self.previous_button.grid(row=0, column=2, padx=3)
+        self.previous_button.grid(row=0, column=1, padx=3)
+        self.cancel_button.grid(row=0, column=2, padx=3)
         self.reset_button.grid(row=0, column=3, padx=3)
         # Position the exit button all the way to the right
         self.exit_button.grid(row=0, column=4, sticky="E", padx=3)
@@ -201,16 +206,15 @@ class BasicLLMChat:
 
         self._insert_text(f"USER:\n{self.user_input}\n\n")
 
-        # Save sent stuff to history
-        self.history.append(self.user_input)
+        # Save the last sent message for possible retrieval
+        self.previous = self.user_input
         # Clear chat box on send
         self.chat_box.delete("1.0", "end-1c")
         # Too many messages to fit the screen -> move to the last
         self.messages.see("end")
 
-        # Let other parts of the code know that a message was sent / response was generated
+        # Let other parts of the code know that a message was sent
         self.is_msg_sent = True
-        self.response_finished = False
 
         # Progressively generate answer in the GUI via threading; improves stability
         response_thread = threading.Thread(target=self._get_answer, daemon=True)
@@ -222,23 +226,20 @@ class BasicLLMChat:
         """Delete everything in the chat box"""
         self.chat_box.delete("1.0", "end-1c")
 
-    def _history_previous(self):
-        """Get previous sent message into the chat box"""
-        n_items = len(self.history)
-
-        if n_items == 0:
+    def _get_previous(self):
+        """Get the last sent message back into the chat box"""
+        if self.previous == "":
             return None
 
-        # Get last saved message
-        last_msg = self.history[n_items - 1]
         self.chat_box.delete("1.0", "end")
-        self.chat_box.insert("end", last_msg)
+        self.chat_box.insert("end", self.previous)
 
     def _exit_gui(self):
         """Clean up and exit the program"""
         self._clear_chat_box()
         self.root.destroy()
-        del self.history
+        del self.previous
+        del self.msg_resp_history
         print("Exiting program.")
         sys.exit(0)
 
@@ -252,67 +253,102 @@ class BasicLLMChat:
             self.messages.config(state="disabled")
             self.messages.see("end")
 
+    def _cancel_request(self):
+        """Used for cancelling the output of the LLM"""
+        if self.is_msg_sent:
+            self.cancel_response = True
+
     def _get_answer(self):
         """Get answer from LLM"""
-        # Disable the send button while getting an answer
+        # Probably not needed to check this 
+        if not self.is_msg_sent:
+            return None
+
+        # Disable some buttons while getting an answer
         self.send_button["state"] = "disabled"
+        self.reset_button["state"] = "disabled"
         self.send_button.configure(background = Settings.lightblue)
 
         # Check if ollama is running in the background
         try:
             r = requests.get("http://localhost:11434/")
         except requests.ConnectionError:
-            explanation = "Failed to connect to localhost:11434\nIs Ollama running?"
+            explanation = """Failed to connect to localhost:11434
+            \nIs Ollama running?
+            \nTo continue, start Ollama and restart the GUI.
+            """
             self._insert_text(f"SYSTEM:\n{explanation}\n\n")
             return None
 
         if r.status_code != 200:
-            self._insert_text(f"SYSTEM:\nOllama is not running.\n\n")
+            self._insert_text(
+                f"SYSTEM:\nCouldn't connect to Ollama. Consider restarting Ollama and the GUI.\n\n"
+            )
             return None
 
-        if self.is_msg_sent:
-            # Always save what the user asks and the response (further below)
-            self.msg_resp_history.append(
-                {
-                    "role": "user",
-                    "content": self.user_input,
-                }
-            )
+        # Always save what the user asks and the response (further below)
+        self.msg_resp_history.append(
+            {
+                "role": "user",
+                "content": self.user_input,
+            }
+        )
 
-            # Connect to the model to chat and get responses in a stream
-            response_stream = ollama.chat(
-                model="llama3",
-                messages=self.msg_resp_history,
-                stream=True
-            )
+        # Connect to the model to chat and get responses in a stream
+        response_stream = ollama.chat(
+            model="llama3",
+            messages=self.msg_resp_history,
+            stream=True
+        )
 
-            self._insert_text("LLM:\n")
+        self._insert_text("LLM:\n")
+        
+        # Build the response by appending the generated text as it is generated
+        self.response_finished = False
+        full_response = str()
+        for llm_output in response_stream:
+            self._insert_text(llm_output["message"]["content"])
+            self.messages.see("end")
+            full_response = full_response + llm_output["message"]["content"]
             
-            # Build the response by appending the generated text as it is generated
-            self.response_finished = False
-            full_response = str()
-            for llm_output in response_stream:
-                self._insert_text(llm_output["message"]["content"])
-                self.messages.see("end")
-                full_response = full_response + llm_output["message"]["content"]
+            # Append partial answer on a cancellation request
+            if self.cancel_response:
+                self.msg_resp_history.append(
+                    {
+                        "role": "assistant",
+                        "content": full_response
+                    }
+                )
+                self._insert_text("\n\n")
+                # Reset message sent checker
+                self.is_msg_sent = False
+                self.response_finished = True
 
-            self.msg_resp_history.append(
-                {
-                    "role": "assistant",
-                    "content": full_response
-                }
-            )
+                # Re-enable the send button
+                self.send_button["state"] = "normal"
+                self.reset_button["state"] = "normal"
+                self.send_button.configure(background = Settings.blue)
+                self.cancel_response = False
+                return None
 
-            # Insert newlines after generated text
-            self._insert_text("\n\n")
+        self.msg_resp_history.append(
+            {
+                "role": "assistant",
+                "content": full_response
+            }
+        )
 
-            # Reset message sent checker
-            self.is_msg_sent = False
-            self.response_finished = True
+        # Insert newlines after generated text
+        self._insert_text("\n\n")
 
-            # Re-enable the send button
-            self.send_button["state"] = "normal"
-            self.send_button.configure(background = Settings.blue)
+        # Reset message sent checker
+        self.is_msg_sent = False
+        self.response_finished = True
+
+        # Re-enable the send button
+        self.send_button["state"] = "normal"
+        self.reset_button["state"] = "normal"
+        self.send_button.configure(background = Settings.blue)
 
 
 chat = BasicLLMChat()
