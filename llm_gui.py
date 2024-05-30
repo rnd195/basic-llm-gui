@@ -1,4 +1,4 @@
-from tkinter import Tk, Frame, Button
+from tkinter import Tk, Frame, Button, font
 from tkinter.scrolledtext import ScrolledText
 import requests
 import ollama
@@ -12,6 +12,7 @@ class Settings:
     blue = "#2654d3"
     lightblue = "#a2b3e1"
     send_keybind = "<Control-Return>"
+    main_fonts = ["Inter", "Courier"]
 
 
 class BasicLLMChat:
@@ -20,6 +21,7 @@ class BasicLLMChat:
 
     Attributes:
         root (Tk): Top level tkinter widget
+        main_font (str): Custom font used in the main parts of the GUI
         frame_messages (Frame): Frame for the messages between the user and LLM
         frame_buttons (Frame): Frame for buttons to interact with the GUI
         frame_chat (Frame): Frame for the user's queries
@@ -57,6 +59,12 @@ class BasicLLMChat:
     def __init__(self):
         self.root = Tk()
         self.root.configure(background=Settings.dark)
+
+        # Set the main font or fallback to "Courier"
+        if Settings.main_fonts[0] in font.families():
+            self.main_font = Settings.main_fonts[0]
+        else:
+            self.main_font = Settings.main_fonts[1]
 
         # Place to display messages between the user and the LLM
         self.frame_messages = Frame(
@@ -99,26 +107,41 @@ class BasicLLMChat:
         self.messages = ScrolledText(
             self.frame_messages,
             width=76,
-            height=30,
-            background=Settings.light
+            height=32,
+            background=Settings.light,
+            padx=5,
+            pady=5
         )
         self.messages.config(wrap="word")
         self.messages.pack()
         # Start in an uneditable mode
         self.messages.config(state="disabled")
+        # Set a custom font in the message box or fallback to a default one
+        self.font_setter(
+            self.messages,
+            self.main_font
+        )
 
         # Actual user input widget
         self.chat_box = ScrolledText(
             self.frame_chat,
             width=76,
-            height=10,
-            background=Settings.light
+            height=11,
+            background=Settings.light,
+            padx=5,
+            pady=5
         )
         self.chat_box.config(wrap="word")
+        # Set a custom font in the chat box or fallback to a default one
+        self.font_setter(
+            self.chat_box,
+            self.main_font
+        )
+
         # Send messages using ctrl+enter
-        self.chat_box.bind(Settings.send_keybind, self._send_message)
+        self.chat_box.bind(Settings.send_keybind, self.send_message)
         # Clear the chat box completely (otherwise there would be a newline in the empty box)
-        self.root.bind(Settings.send_keybind, self._clear_chat_box)
+        self.root.bind(Settings.send_keybind, self.clear_chat_box)
         self.chat_box.pack()
 
         # Used as input to the LLM
@@ -138,7 +161,7 @@ class BasicLLMChat:
         self.send_button = Button(
             self.frame_buttons,
             text="Send",
-            command=self._send_message,
+            command=self.send_message,
             background=Settings.blue,
             foreground=Settings.light,
             padx=10
@@ -147,7 +170,7 @@ class BasicLLMChat:
         self.previous_button = Button(
             self.frame_buttons,
             text="Previous",
-            command=self._get_previous,
+            command=self.get_previous,
             background=Settings.light,
             foreground=Settings.dark,
             padx=5
@@ -156,7 +179,7 @@ class BasicLLMChat:
         self.cancel_button = Button(
             self.frame_buttons,
             text="Cancel",
-            command=self._cancel_request,
+            command=self.cancel_request,
             background=Settings.light,
             foreground=Settings.dark,
             padx=5
@@ -165,7 +188,7 @@ class BasicLLMChat:
         self.reset_button = Button(
             self.frame_buttons,
             text="New Chat",
-            command=self._reset_chat,
+            command=self.reset_chat,
             background=Settings.light,
             foreground=Settings.dark,
             padx=5
@@ -174,7 +197,7 @@ class BasicLLMChat:
         self.exit_button = Button(
             self.frame_buttons,
             text="Exit",
-            command=self._exit_gui,
+            command=self.exit_gui,
             background=Settings.light,
             foreground=Settings.dark,
             padx=5
@@ -188,7 +211,7 @@ class BasicLLMChat:
         self.exit_button.grid(row=0, column=4, sticky="E", padx=3)
 
         # Safe exit
-        self.root.protocol("WM_DELETE_WINDOW", self._exit_gui)
+        self.root.protocol("WM_DELETE_WINDOW", self.exit_gui)
 
         self.root.mainloop()
 
@@ -198,7 +221,13 @@ class BasicLLMChat:
         self.messages.insert("end", to_insert)
         self.messages.config(state="disabled")
 
-    def _send_message(self, event=None):
+    def font_setter(self, widget, new_font):
+        """Set a custom font to a widget"""
+        widget.config(
+            font=(new_font, 10, "normal")
+        )
+
+    def send_message(self, event=None):
         """Send message to the LLM"""
         self.user_input = self.chat_box.get("1.0", "end-1c")
         if self.user_input == "":
@@ -217,16 +246,16 @@ class BasicLLMChat:
         self.is_msg_sent = True
 
         # Progressively generate answer in the GUI via threading; improves stability
-        response_thread = threading.Thread(target=self._get_answer, daemon=True)
+        response_thread = threading.Thread(target=self.get_answer, daemon=True)
 
         # Run response thread after 1ms
         self.root.after(1, response_thread.start())
 
-    def _clear_chat_box(self, event=None):
+    def clear_chat_box(self, event=None):
         """Delete everything in the chat box"""
         self.chat_box.delete("1.0", "end-1c")
 
-    def _get_previous(self):
+    def get_previous(self):
         """Get the last sent message back into the chat box"""
         if self.previous == "":
             return None
@@ -234,16 +263,16 @@ class BasicLLMChat:
         self.chat_box.delete("1.0", "end")
         self.chat_box.insert("end", self.previous)
 
-    def _exit_gui(self):
+    def exit_gui(self):
         """Clean up and exit the program"""
-        self._clear_chat_box()
+        self.clear_chat_box()
         self.root.destroy()
         del self.previous
         del self.msg_resp_history
         print("Exiting program.")
         sys.exit(0)
 
-    def _reset_chat(self):
+    def reset_chat(self):
         """Clear all history and start a new chat"""
         if self.response_finished:
             self.msg_resp_history = []
@@ -253,12 +282,12 @@ class BasicLLMChat:
             self.messages.config(state="disabled")
             self.messages.see("end")
 
-    def _cancel_request(self):
+    def cancel_request(self):
         """Used for cancelling the output of the LLM"""
         if self.is_msg_sent:
             self.cancel_response = True
 
-    def _get_answer(self):
+    def get_answer(self):
         """Get answer from LLM"""
         # Probably not needed to check this 
         if not self.is_msg_sent:
