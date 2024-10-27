@@ -325,7 +325,7 @@ class BasicLLMChat:
 
         # Connect to the model to chat and get responses in a stream
         response_stream = ollama.chat(
-            model="llama3.1",
+            model="llama3",
             messages=self.msg_resp_history,
             stream=True
         )
